@@ -1,0 +1,190 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "Find the Burgers HUB",
+   LoadingTitle = "Find the Burgers",
+   LoadingSubtitle = "by Nixon",
+   ConfigurationSaving = {
+      Enabled = false,
+      FolderName = "burger.save",
+      FileName = "Config"
+   },
+   KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local AssetService = game:GetService("AssetService")
+local player = Players.LocalPlayer
+local mainPlaceId = game.PlaceId
+
+-- State
+local selectedBurger = nil
+local selectedRealmId = nil
+
+-- Tabs
+local TPTab = Window:CreateTab("TP Burgers", 4483362458)
+local RealmsTab = Window:CreateTab("Realms", 4483362458)
+
+-- ==========================================
+-- 1. TP BURGERS TAB
+-- ==========================================
+TPTab:CreateButton({
+   Name = "Collect All Burgers (Bring to Me)",
+   Callback = function()
+      local count = 0
+      for _, obj in pairs(workspace:GetDescendants()) do
+         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "burger") then
+            obj.CFrame = player.Character.HumanoidRootPart.CFrame
+            count = count + 1
+         end
+      end
+      Rayfield:Notify({Title = "Success", Content = "Brought " .. count .. " burgers!", Duration = 3})
+   end,
+})
+
+local BurgerDropdown = TPTab:CreateDropdown({
+   Name = "Select a Burger",
+   Options = {"Scan to find burgers..."},
+   CurrentOption = {"Scan to find burgers..."},
+   MultipleOptions = false,
+   Callback = function(Option)
+      selectedBurger = Option[1]
+   end,
+})
+
+TPTab:CreateButton({
+   Name = "Scan workspace to find Burgers",
+   Callback = function()
+      local options = {}
+      for _, obj in pairs(workspace:GetDescendants()) do
+         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "burger") then
+            table.insert(options, obj.Name)
+         end
+      end
+      if #options > 0 then
+         BurgerDropdown:Refresh(options, true)
+      else
+         Rayfield:Notify({Title = "Scan Done", Content = "No burgers found.", Duration = 3})
+      end
+   end,
+})
+
+TPTab:CreateSection("Selection Actions")
+
+TPTab:CreateButton({
+   Name = "Go To Burger",
+   Callback = function()
+      local target = workspace:FindFirstChild(selectedBurger, true)
+      if target and target:IsA("BasePart") then
+         player.Character.HumanoidRootPart.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+      end
+   end,
+})
+
+TPTab:CreateButton({
+   Name = "Bring Burger Here",
+   Callback = function()
+      local target = workspace:FindFirstChild(selectedBurger, true)
+      if target and target:IsA("BasePart") then
+         target.CFrame = player.Character.HumanoidRootPart.CFrame
+      end
+   end,
+})
+
+-- ==========================================
+-- 2. REALMS TAB
+-- ==========================================
+RealmsTab:CreateSection("Sub-Place Detection")
+
+local realmNames = {}
+local realmIds = {}
+
+local RealmDropdown = RealmsTab:CreateDropdown({
+   Name = "Detected Realms",
+   Options = {"Scan for realms..."},
+   CurrentOption = {"Scan for realms..."},
+   MultipleOptions = false,
+   Callback = function(Option)
+      selectedRealmId = realmIds[Option[1]]
+   end,
+})
+
+RealmsTab:CreateButton({
+   Name = "Auto-Scan for Sub-Places",
+   Callback = function()
+      realmNames = {}
+      realmIds = {}
+      
+      -- Method A: Checking for Game Portals/Teleport Scripts in Workspace
+      for _, v in pairs(workspace:GetDescendants()) do
+         if v:IsA("TouchTransmitter") and v.Parent then
+            local p = v.Parent
+            if string.find(string.lower(p.Name), "portal") or string.find(string.lower(p.Name), "realm") then
+                realmNames[p.Name] = true -- Use Name as key temporarily
+                -- Try to find a PlaceID attribute or value if the dev stored one
+                local idVal = p:FindFirstChild("PlaceID") or p:FindFirstChild("Destination")
+                if idVal and (idVal:IsA("IntValue") or idVal:IsA("NumberValue")) then
+                    realmIds[p.Name] = idVal.Value
+                end
+            end
+         end
+      end
+
+      -- Method B: AssetService (Works for many multi-place games)
+      pcall(function()
+          local pages = AssetService:GetGamePlacesAsync()
+          while true do
+              for _, place in pairs(pages:GetCurrentPage()) do
+                  if place.PlaceId ~= game.PlaceId then
+                      local name = place.Name or "Place: " .. place.PlaceId
+                      realmNames[name] = true
+                      realmIds[name] = place.PlaceId
+                  end
+              end
+              if pages.IsFinished then break end
+              pages:AdvanceToNextPageAsync()
+          end
+      end)
+
+      local options = {}
+      for name, _ in pairs(realmNames) do table.insert(options, name) end
+      
+      if #options > 0 then
+          RealmDropdown:Refresh(options, true)
+          Rayfield:Notify({Title = "Scan Complete", Content = "Found " .. #options .. " sub-places!", Duration = 3})
+      else
+          Rayfield:Notify({Title = "Scan Complete", Content = "No sub-places detected via API or Portals.", Duration = 3})
+      end
+   end,
+})
+
+RealmsTab:CreateButton({
+   Name = "Unlock & Teleport to Realm",
+   Callback = function()
+      if selectedRealmId then
+         TeleportService:Teleport(selectedRealmId, player)
+      else
+         Rayfield:Notify({Title = "Error", Content = "Please select a realm from the dropdown!", Duration = 3})
+      end
+   end,
+})
+
+RealmsTab:CreateSection("Navigation")
+
+RealmsTab:CreateButton({
+   Name = "Back to Main Realm",
+   Callback = function()
+      TeleportService:Teleport(mainPlaceId, player)
+   end,
+})
+
+RealmsTab:CreateInput({
+   Name = "Manual ID Unlock",
+   PlaceholderText = "Enter ID here...",
+   Callback = function(Text)
+      selectedRealmId = tonumber(Text)
+   end,
+})
+
+Rayfield:LoadConfiguration()
