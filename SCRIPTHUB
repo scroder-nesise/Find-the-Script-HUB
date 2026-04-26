@@ -1,0 +1,941 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+
+
+local Window = Rayfield:CreateWindow({
+
+   Name = "Find the Script HUB",
+
+   LoadingTitle = "Find the Script HUB",
+
+   LoadingSubtitle = "by Nixon",
+
+   ConfigurationSaving = {
+
+      Enabled = false,
+
+      FolderName = "burger.save",
+
+      FileName = "Config"
+
+   },
+
+   KeySystem = false
+
+})
+
+
+
+local Players = game:GetService("Players")
+
+local TeleportService = game:GetService("TeleportService")
+
+local AssetService = game:GetService("AssetService")
+
+local player = Players.LocalPlayer
+
+local mainPlaceId = game.PlaceId
+
+
+
+-- State
+
+local selectedBurger = nil
+
+local selectedChomik = nil
+
+local selectedMarker = nil
+
+local selectedRealmId = nil
+
+
+
+-- Object maps (label -> actual BasePart reference)
+
+local burgerObjects = {}
+
+local chomikObjects = {}
+
+local markerObjects  = {}
+
+
+
+-- Tabs
+
+local TPTab = Window:CreateTab("Main", 4483362458)
+
+local RealmsTab = Window:CreateTab("Realms", 4483362458)
+
+
+
+-- ==========================================
+
+-- HELPERS
+
+-- ==========================================
+
+
+
+-- Safe character/root getter — returns HumanoidRootPart or nil
+
+local function getRoot()
+
+   local char = player.Character
+
+   return char and char:FindFirstChild("HumanoidRootPart")
+
+end
+
+
+
+-- Add a BasePart to an object map with a deduplicated label, and push to options table
+
+local function registerObj(map, options, obj)
+
+   local base = obj.Name
+
+   local label = base
+
+   local i = 1
+
+   while map[label] do
+
+      i = i + 1
+
+      label = base .. " (" .. i .. ")"
+
+   end
+
+   map[label] = obj
+
+   table.insert(options, label)
+
+end
+
+
+
+-- Generic deep scanner: finds all BaseParts related to a keyword
+
+local function scanForKeyword(keyword)
+
+   local map = {}
+
+   local options = {}
+
+   local seen = {} -- track by object identity to avoid double-adding
+
+
+
+   for _, obj in pairs(workspace:GetDescendants()) do
+
+      local nameLower = string.lower(obj.Name)
+
+
+
+      -- BasePart directly named with keyword
+
+      if obj:IsA("BasePart") and string.find(nameLower, keyword) then
+
+         if not seen[obj] then
+
+            seen[obj] = true
+
+            registerObj(map, options, obj)
+
+         end
+
+
+
+      -- Model or Folder named with keyword → grab its root BasePart
+
+      elseif (obj:IsA("Model") or obj:IsA("Folder")) and string.find(nameLower, keyword) then
+
+         local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)
+
+         if part and not seen[part] then
+
+            seen[part] = true
+
+            registerObj(map, options, part)
+
+         end
+
+
+
+      -- BasePart whose parent container is named with keyword
+
+      elseif obj:IsA("BasePart") and obj.Parent
+
+         and string.find(string.lower(obj.Parent.Name), keyword) then
+
+         if not seen[obj] then
+
+            seen[obj] = true
+
+            registerObj(map, options, obj)
+
+         end
+
+
+
+      -- TouchTransmitter whose parent BasePart is named with keyword
+
+      elseif obj:IsA("TouchTransmitter") then
+
+         local part = obj.Parent
+
+         if part and part:IsA("BasePart")
+
+            and string.find(string.lower(part.Name), keyword)
+
+            and not seen[part] then
+
+            seen[part] = true
+
+            registerObj(map, options, part)
+
+         end
+
+      end
+
+   end
+
+
+
+   return map, options
+
+end
+
+
+
+-- ==========================================
+
+-- 1. MAIN TAB — BURGERS
+
+-- ==========================================
+
+
+
+TPTab:CreateButton({
+
+   Name = "Collect All Burgers (Bring to Me)",
+
+   Callback = function()
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local count = 0
+
+      for _, obj in pairs(workspace:GetDescendants()) do
+
+         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "burger") then
+
+            obj.CFrame = root.CFrame
+
+            count = count + 1
+
+         end
+
+      end
+
+      Rayfield:Notify({Title = "Success", Content = "Brought " .. count .. " burgers!", Duration = 3})
+
+   end,
+
+})
+
+
+
+local BurgerDropdown = TPTab:CreateDropdown({
+
+   Name = "Select a Burger",
+
+   Options = {"Scan to find burgers..."},
+
+   CurrentOption = {"Scan to find burgers..."},
+
+   MultipleOptions = false,
+
+   Callback = function(Option)
+
+      selectedBurger = Option[1]
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Scan Burgers",
+
+   Callback = function()
+
+      local map, options = scanForKeyword("burger")
+
+      if #options > 0 then
+
+         burgerObjects = map
+
+         BurgerDropdown:Refresh(options, true)
+
+         Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " burger(s)!", Duration = 3})
+
+      else
+
+         Rayfield:Notify({Title = "Scan Done", Content = "No burgers found.", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+TPTab:CreateSection("Selection Actions")
+
+
+
+TPTab:CreateButton({
+
+   Name = "Go To Burger",
+
+   Callback = function()
+
+      if not selectedBurger then
+
+         Rayfield:Notify({Title = "Error", Content = "No burger selected!", Duration = 3})
+
+         return
+
+      end
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local target = burgerObjects[selectedBurger]
+
+      if target and target.Parent then
+
+         root.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Burger no longer exists. Re-scan!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Bring Burger Here",
+
+   Callback = function()
+
+      if not selectedBurger then
+
+         Rayfield:Notify({Title = "Error", Content = "No burger selected!", Duration = 3})
+
+         return
+
+      end
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local target = burgerObjects[selectedBurger]
+
+      if target and target.Parent then
+
+         target.CFrame = root.CFrame
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Burger no longer exists. Re-scan!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+-- ==========================================
+
+-- SECTION 2 — CHOMIKS
+
+-- ==========================================
+
+
+
+TPTab:CreateSection("Section 2 - Chomiks")
+
+
+
+TPTab:CreateButton({
+
+   Name = "Collect All Chomiks (Bring to Me)",
+
+   Callback = function()
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local count = 0
+
+      for _, obj in pairs(workspace:GetDescendants()) do
+
+         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "chomik") then
+
+            obj.CFrame = root.CFrame
+
+            count = count + 1
+
+         end
+
+      end
+
+      Rayfield:Notify({Title = "Success", Content = "Brought " .. count .. " chomiks!", Duration = 3})
+
+   end,
+
+})
+
+
+
+local ChomikDropdown = TPTab:CreateDropdown({
+
+   Name = "Select a Chomik",
+
+   Options = {"Scan to find chomiks..."},
+
+   CurrentOption = {"Scan to find chomiks..."},
+
+   MultipleOptions = false,
+
+   Callback = function(Option)
+
+      selectedChomik = Option[1]
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Scan Chomiks",
+
+   Callback = function()
+
+      local map, options = scanForKeyword("chomik")
+
+      if #options > 0 then
+
+         chomikObjects = map
+
+         ChomikDropdown:Refresh(options, true)
+
+         Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " chomik(s)!", Duration = 3})
+
+      else
+
+         Rayfield:Notify({Title = "Scan Done", Content = "No chomiks found in workspace.", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Go To Chomik",
+
+   Callback = function()
+
+      if not selectedChomik then
+
+         Rayfield:Notify({Title = "Error", Content = "No chomik selected!", Duration = 3})
+
+         return
+
+      end
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local target = chomikObjects[selectedChomik]
+
+      if target and target.Parent then
+
+         root.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Chomik no longer exists. Re-scan!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Bring Chomik Here",
+
+   Callback = function()
+
+      if not selectedChomik then
+
+         Rayfield:Notify({Title = "Error", Content = "No chomik selected!", Duration = 3})
+
+         return
+
+      end
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local target = chomikObjects[selectedChomik]
+
+      if target and target.Parent then
+
+         target.CFrame = root.CFrame
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Chomik no longer exists. Re-scan!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+-- ==========================================
+
+-- SECTION 3 — MARKERS
+
+-- ==========================================
+
+
+
+TPTab:CreateSection("Section 3 - Marker")
+
+
+
+TPTab:CreateButton({
+
+   Name = "Collect All Markers (Bring to Me)",
+
+   Callback = function()
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local count = 0
+
+      for _, obj in pairs(workspace:GetDescendants()) do
+
+         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "marker") then
+
+            obj.CFrame = root.CFrame
+
+            count = count + 1
+
+         end
+
+      end
+
+      Rayfield:Notify({Title = "Success", Content = "Brought " .. count .. " markers!", Duration = 3})
+
+   end,
+
+})
+
+
+
+local MarkerDropdown = TPTab:CreateDropdown({
+
+   Name = "Select a Marker",
+
+   Options = {"Scan to find markers..."},
+
+   CurrentOption = {"Scan to find markers..."},
+
+   MultipleOptions = false,
+
+   Callback = function(Option)
+
+      selectedMarker = Option[1]
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Scan Markers",
+
+   Callback = function()
+
+      local map, options = scanForKeyword("marker")
+
+      if #options > 0 then
+
+         markerObjects = map
+
+         MarkerDropdown:Refresh(options, true)
+
+         Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " marker(s)!", Duration = 3})
+
+      else
+
+         Rayfield:Notify({Title = "Scan Done", Content = "No markers found in workspace.", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Go To Marker",
+
+   Callback = function()
+
+      if not selectedMarker then
+
+         Rayfield:Notify({Title = "Error", Content = "No marker selected!", Duration = 3})
+
+         return
+
+      end
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local target = markerObjects[selectedMarker]
+
+      if target and target.Parent then
+
+         root.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Marker no longer exists. Re-scan!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+TPTab:CreateButton({
+
+   Name = "Bring Marker Here",
+
+   Callback = function()
+
+      if not selectedMarker then
+
+         Rayfield:Notify({Title = "Error", Content = "No marker selected!", Duration = 3})
+
+         return
+
+      end
+
+      local root = getRoot()
+
+      if not root then
+
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+
+         return
+
+      end
+
+      local target = markerObjects[selectedMarker]
+
+      if target and target.Parent then
+
+         target.CFrame = root.CFrame
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Marker no longer exists. Re-scan!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+-- ==========================================
+
+-- 2. REALMS TAB (UNTOUCHED)
+
+-- ==========================================
+
+RealmsTab:CreateSection("Sub-Place Detection")
+
+
+
+local realmNames = {}
+
+local realmIds = {}
+
+
+
+local RealmDropdown = RealmsTab:CreateDropdown({
+
+   Name = "Detected Realms",
+
+   Options = {"Scan for realms..."},
+
+   CurrentOption = {"Scan for realms..."},
+
+   MultipleOptions = false,
+
+   Callback = function(Option)
+
+      selectedRealmId = realmIds[Option[1]]
+
+   end,
+
+})
+
+
+
+RealmsTab:CreateButton({
+
+   Name = "Auto-Scan for Sub-Places",
+
+   Callback = function()
+
+      realmNames = {}
+
+      realmIds = {}
+
+
+
+      for _, v in pairs(workspace:GetDescendants()) do
+
+         if v:IsA("TouchTransmitter") and v.Parent then
+
+            local p = v.Parent
+
+            if string.find(string.lower(p.Name), "portal") or string.find(string.lower(p.Name), "realm") then
+
+               realmNames[p.Name] = true
+
+               local idVal = p:FindFirstChild("PlaceID") or p:FindFirstChild("Destination")
+
+               if idVal and (idVal:IsA("IntValue") or idVal:IsA("NumberValue")) then
+
+                  realmIds[p.Name] = idVal.Value
+
+               end
+
+            end
+
+         end
+
+      end
+
+
+
+      pcall(function()
+
+         local pages = AssetService:GetGamePlacesAsync()
+
+         while true do
+
+            for _, place in pairs(pages:GetCurrentPage()) do
+
+               if place.PlaceId ~= game.PlaceId then
+
+                  local name = place.Name or "Place: " .. place.PlaceId
+
+                  realmNames[name] = true
+
+                  realmIds[name] = place.PlaceId
+
+               end
+
+            end
+
+            if pages.IsFinished then break end
+
+            pages:AdvanceToNextPageAsync()
+
+         end
+
+      end)
+
+
+
+      local options = {}
+
+      for name, _ in pairs(realmNames) do table.insert(options, name) end
+
+
+
+      if #options > 0 then
+
+         RealmDropdown:Refresh(options, true)
+
+         Rayfield:Notify({Title = "Scan Complete", Content = "Found " .. #options .. " sub-places!", Duration = 3})
+
+      else
+
+         Rayfield:Notify({Title = "Scan Complete", Content = "No sub-places detected via API or Portals.", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+RealmsTab:CreateButton({
+
+   Name = "Unlock & Teleport to Realm",
+
+   Callback = function()
+
+      if selectedRealmId then
+
+         TeleportService:Teleport(selectedRealmId, player)
+
+      else
+
+         Rayfield:Notify({Title = "Error", Content = "Please select a realm from the dropdown!", Duration = 3})
+
+      end
+
+   end,
+
+})
+
+
+
+RealmsTab:CreateSection("Navigation")
+
+
+
+RealmsTab:CreateButton({
+
+   Name = "Back to Main Realm",
+
+   Callback = function()
+
+      TeleportService:Teleport(mainPlaceId, player)
+
+   end,
+
+})
+
+
+
+RealmsTab:CreateInput({
+
+   Name = "Manual ID Unlock",
+
+   PlaceholderText = "Enter ID here...",
+
+   Callback = function(Text)
+
+      selectedRealmId = tonumber(Text)
+
+   end,
+
+})
+
+
+
+Rayfield:LoadConfiguration()
