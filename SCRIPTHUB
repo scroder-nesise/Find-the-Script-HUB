@@ -26,6 +26,7 @@ local mainPlaceId = game.PlaceId
 local selectedBurger = nil
 local selectedChomik = nil
 local selectedMarker = nil
+local selectedBacon = nil
 local selectedRealmId = nil
 
 
@@ -33,6 +34,7 @@ local selectedRealmId = nil
 local burgerObjects = {}
 local chomikObjects = {}
 local markerObjects  = {}
+local baconObjects = {}
 
 
 -- Tabs
@@ -135,7 +137,11 @@ TPTab:CreateButton({
       end
       local count = 0
       for _, obj in pairs(workspace:GetDescendants()) do
-         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "burger") then
+         if obj:IsA("BasePart") and (
+   string.find(string.lower(obj.Name), "burger") or
+   string.find(string.lower(obj.Name), "bur") or
+   string.find(string.lower(obj.Name), "ger")
+      ) then
             obj.CFrame = root.CFrame
             count = count + 1
          end
@@ -151,8 +157,12 @@ local BurgerDropdown = TPTab:CreateDropdown({
    CurrentOption = {"Scan to find burgers..."},
    MultipleOptions = false,
    Callback = function(Option)
+   if typeof(Option) == "table" then
       selectedBurger = Option[1]
-   end,
+   else
+      selectedBurger = Option
+   end
+end, 
 })
 
 
@@ -161,7 +171,7 @@ TPTab:CreateButton({
    Callback = function()
       -- Searches: burger, bur, ger
       local map, options = scanForKeywords({"burger", "bur", "ger"})
-      if #options > 0 then
+      if options and #options > 0 then
          burgerObjects = map
          BurgerDropdown:Refresh(options, true)
          Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " burger(s)!", Duration = 3})
@@ -234,7 +244,11 @@ TPTab:CreateButton({
       end
       local count = 0
       for _, obj in pairs(workspace:GetDescendants()) do
-         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "chomik") then
+         if obj:IsA("BasePart") and (
+   string.find(string.lower(obj.Name), "chomik") or
+   string.find(string.lower(obj.Name), "cho") or
+   string.find(string.lower(obj.Name), "mik")
+) then
             obj.CFrame = root.CFrame
             count = count + 1
          end
@@ -250,8 +264,12 @@ local ChomikDropdown = TPTab:CreateDropdown({
    CurrentOption = {"Scan to find chomiks..."},
    MultipleOptions = false,
    Callback = function(Option)
+   if typeof(Option) == "table" then
       selectedChomik = Option[1]
-   end,
+   else
+      selectedChomik = Option
+   end
+end, 
 })
 
 
@@ -260,7 +278,7 @@ TPTab:CreateButton({
    Callback = function()
       -- Searches: chomik, cho, mik
       local map, options = scanForKeywords({"chomik", "cho", "mik"})
-      if #options > 0 then
+      if options and #options > 0 then
          chomikObjects = map
          ChomikDropdown:Refresh(options, true)
          Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " chomik(s)!", Duration = 3})
@@ -333,7 +351,11 @@ TPTab:CreateButton({
       end
       local count = 0
       for _, obj in pairs(workspace:GetDescendants()) do
-         if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "marker") then
+         if obj:IsA("BasePart") and (
+   string.find(string.lower(obj.Name), "marker") or
+   string.find(string.lower(obj.Name), "mar") or
+   string.find(string.lower(obj.Name), "ker")
+) then
             obj.CFrame = root.CFrame
             count = count + 1
          end
@@ -349,8 +371,12 @@ local MarkerDropdown = TPTab:CreateDropdown({
    CurrentOption = {"Scan to find markers..."},
    MultipleOptions = false,
    Callback = function(Option)
+   if typeof(Option) == "table" then
       selectedMarker = Option[1]
-   end,
+   else
+      selectedMarker = Option
+   end
+end, 
 })
 
 
@@ -359,7 +385,7 @@ TPTab:CreateButton({
    Callback = function()
       -- Searches: marker, mar, ker
       local map, options = scanForKeywords({"marker", "mar", "ker"})
-      if #options > 0 then
+      if options and #options > 0 then
          markerObjects = map
          MarkerDropdown:Refresh(options, true)
          Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " marker(s)!", Duration = 3})
@@ -415,9 +441,111 @@ TPTab:CreateButton({
    end,
 })
 
+-- ==========================================
+-- SECTION 4 — BACON
+-- ==========================================
+
+TPTab:CreateSection("Section 4 - Bacon")
+
+TPTab:CreateButton({
+   Name = "Collect All Bacons (Bring to Me)",
+   Callback = function()
+      local root = getRoot()
+      if not root then
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+         return
+      end
+      local count = 0
+      for _, obj in pairs(workspace:GetDescendants()) do
+         if obj:IsA("BasePart") and (
+   string.find(string.lower(obj.Name), "bacon") or
+   string.find(string.lower(obj.Name), "bac") or
+   string.find(string.lower(obj.Name), "con")
+) then
+            obj.CFrame = root.CFrame
+            count = count + 1
+         end
+      end
+      Rayfield:Notify({Title = "Success", Content = "Brought " .. count .. " bacon(s)!", Duration = 3})
+   end,
+})
+
+local BaconDropdown = TPTab:CreateDropdown({
+   Name = "Select a Bacon",
+   Options = {"Scan to find bacons..."},
+   CurrentOption = {"Scan to find bacons..."},
+   MultipleOptions = false,
+   Callback = function(Option)
+   if typeof(Option) == "table" then
+      selectedBacon = Option[1]
+   else
+      selectedBacon = Option
+   end
+end, 
+})
+
+TPTab:CreateButton({
+   Name = "Scan Bacons",
+   Callback = function()
+      -- Searches: bacon, bac, con
+      local map, options = scanForKeywords({"bacon", "bac", "con"})
+      if options and #options > 0 then
+         baconObjects = map
+         BaconDropdown:Refresh(options, true)
+         Rayfield:Notify({Title = "Scan Done", Content = "Found " .. #options .. " bacon(s)!", Duration = 3})
+      else
+         Rayfield:Notify({Title = "Scan Done", Content = "No bacons found.", Duration = 3})
+      end
+   end,
+})
+
+TPTab:CreateSection("Selection Actions")
+
+TPTab:CreateButton({
+   Name = "Go To Bacon",
+   Callback = function()
+      if not selectedBacon then
+         Rayfield:Notify({Title = "Error", Content = "No bacon selected!", Duration = 3})
+         return
+      end
+      local root = getRoot()
+      if not root then
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+         return
+      end
+      local target = baconObjects[selectedBacon]
+      if target and target.Parent then
+         root.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+      else
+         Rayfield:Notify({Title = "Error", Content = "Bacon no longer exists. Re-scan!", Duration = 3})
+      end
+   end,
+})
+
+TPTab:CreateButton({
+   Name = "Bring Bacon Here",
+   Callback = function()
+      if not selectedBacon then
+         Rayfield:Notify({Title = "Error", Content = "No bacon selected!", Duration = 3})
+         return
+      end
+      local root = getRoot()
+      if not root then
+         Rayfield:Notify({Title = "Error", Content = "Character not found!", Duration = 3})
+         return
+      end
+      local target = baconObjects[selectedBacon]
+      if target and target.Parent then
+         target.CFrame = root.CFrame
+      else
+         Rayfield:Notify({Title = "Error", Content = "Bacon no longer exists. Re-scan!", Duration = 3})
+      end
+   end,
+})
+
 
 -- ==========================================
--- 2. REALMS TAB (UNTOUCHED)
+-- 2. REALMS TAB
 -- ==========================================
 RealmsTab:CreateSection("Sub-Place Detection")
 
@@ -430,8 +558,9 @@ local RealmDropdown = RealmsTab:CreateDropdown({
    CurrentOption = {"Scan for realms..."},
    MultipleOptions = false,
    Callback = function(Option)
-      selectedRealmId = realmIds[Option[1]]
-   end,
+   local value = typeof(Option) == "table" and Option[1] or Option
+   selectedRealmId = realmIds[value]
+end,
 })
 
 RealmsTab:CreateButton({
